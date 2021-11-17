@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<style>
+	canvas {
+		id="myCanvas"
+		border:1px solid #d3d3d3;
+		background-color: 'grey';
+	}
+	</style>
+	<style>
+		body {
+			margin: 0px;
+			padding: 0px;
+		}
+	</style>
+</head>
+<body data-rsssl=1 onload="start()">
+<canvas id="myCanvas" width="700" height="600"></canvas>
+<script>
+
+var myGamePiece;
+var myGameWidth;
+var myGameHeight;
+var myGameCell = [];
+	// 'black' (led is not burning, this is the target position)
+	// 'white' (the white leds indicates your current position)
+	// 'red' (red leds will kill you when you touch them)
+	// 'purple' (purple leds can be used to step on)
+var myPositionRing = 0;
+var myPositionLed = 14;
+var enemyPositionRing = 1;
+var enemyPositionLed = 45;
+var targetPositionRing = 1;
+var targetPositionLed = 15;
+var myLevel = 1;
+var nrLevels = 2;
+var nrLedsOuterRing = 60;
+var nrRings = 2;
+
+
+function writeMessage(canvas, message) {
+	var context = canvas.getContext('2d');
+	context.clearRect(0, 0, canvas.width, canvas.height);
+	context.font = '18pt Calibri';
+	context.fillStyle = 'black';
+	context.fillText(message, 10, 25);
+}
+function getMousePos(canvas, evt) {
+	var rect = canvas.getBoundingClientRect();
+	return {
+		x: evt.clientX - rect.left,
+		y: evt.clientY - rect.top
+	};
+}
+
+var canvas = document.getElementById('myCanvas');
+
+/*canvas.addEventListener('click', function(evt) {
+	uniKeyCode(canvas, evt);
+	var mousePos = getMousePos(canvas, evt);
+	var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y;
+	 writeMessage(canvas, message);
+	var columnNr = Math.floor(mousePos.x/myGameWidth*7);
+	var rowNr = getFreeRow(columnNr);
+	myGameCell[columnNr][rowNr] = myGamePlayer;
+	drawGameArea();
+	if(myGamePlayer==1){myGamePlayer=2;}else{myGamePlayer=1;}
+}, false);*/
+
+document.addEventListener('keydown', function(evt) {
+		var key = evt.keyCode;
+		//alert ("Unicode KEY code: " + key);
+		if (key == 32){ // spacebar
+			//alert ("space");
+			if(!(myPositionLed%2)) {
+				if(myPositionRing==0){
+					myPositionRing=1;
+				}else{
+					myPositionRing=0;
+				}
+			}
+		} else if (key == 37){ // left arrow
+			//alert ("left");
+			if(myPositionRing==1){
+				if(myPositionLed==59){
+					myPositionLed=0;
+				}else{
+					myPositionLed++;
+				}
+			}else{
+				if(myPositionLed>=58){
+					myPositionLed=0;
+				}else{
+					myPositionLed+=2;
+				}
+			}
+		} else if (key == 39){ // right arrow
+			//alert ("right");
+			if(myPositionRing==1){
+				if(myPositionLed==0){
+					myPositionLed=59;
+				}else{
+					myPositionLed--;
+				}
+			}else{
+				if(myPositionLed<=1){
+					myPositionLed=58;
+				}else{
+					myPositionLed-=2;
+				}
+			}
+		} else {
+			//alert ("error");
+			return 'error';
+		}
+//		niceEffect();
+		evaluateGame();// myPosition is already updated 
+    }, false);
+	  
+function start() {
+	myGameWidth = 700;
+    myGameHeight = 600;
+
+    ctx = this.canvas.getContext("2d");
+    ctx.beginPath();
+    ctx.rect(0, 0, myGameWidth, myGameHeight);
+	ctx.fillStyle = 'grey';
+	ctx.fill();
+	
+	// initialize myGameCell to 0 and draw cells
+    for (let i = 0; i < nrRings; i++){// 2 rings of leds, 30 leds on the inner ring
+		myGameCell[i] = [];
+		for (let j = 0; j < nrLedsOuterRing; j++){ // 60 leds on the outer ring
+			myGameCell[i][j] = 'purple';// all leds are purple
+		}
+    }
+	myGameCell[myPositionRing][myPositionLed]='white';
+	myGameCell[1][45]='black';
+	/*myGameCell[0][1]='white';
+	myGameCell[0][2]='red';
+	myGameCell[1][0]='black';
+	myGameCell[1][1]='white';
+	myGameCell[1][2]='red';*/
+	//drawGameArea();
+	//niceEffect();
+	drawLoop();
+}
+
+function drawLoop() {
+	var n = 0;
+	for (let i = 0; i < 300000; i++) {
+	   // create a closure to preserve the value of "i"
+	   (function(i) {		
+		  window.setTimeout(function() {
+			// move the enemy
+			if(!(i%10)){// every 1 in 10 screen refreshes, the enemy moves
+				if(enemyPositionLed<59){enemyPositionLed++;}else{enemyPositionLed=0;}
+			}
+			evaluateGame();
+			
+			// redraw everything
+			drawGameArea();
+			
+		  }, i * 10);// wait X ms
+	   }(i));
+	}
+}
+
+function niceEffect() {
+	var n = 0;
+	for (let i = 0; i < 30; i++) {
+	   // create a closure to preserve the value of "i"
+	   (function(i) {		
+		  window.setTimeout(function() {
+			drawGameArea();
+			for (let j = 0; j < nrLedsOuterRing; j++) {
+				if(i%2){
+					myGameCell[0][j] = 'yellow';
+					myGameCell[1][j] = 'green';
+				}else{
+					myGameCell[0][j] = 'green';
+					myGameCell[1][j] = 'yellow';
+				}
+			}	
+		  }, i * 50);// wait X ms
+	   }(i));
+	   
+	 }
+	/*for (let j = 0; j < 300; j++) {
+	   // create a closure to preserve the value of "i"
+	   (function(j) {		
+		  window.setTimeout(function() {
+			n = j%60;
+			myGameCell[1][n] = 'yellow';
+			myGameCell[1][n+1] = 'orange';
+			myGameCell[1][n+2] = 'red';
+			drawGameArea();
+			myGameCell[1][n] = 'purple';
+			myGameCell[1][n+1] = 'purple';
+			myGameCell[1][n+2] = 'purple';
+		  }, j * 200);
+
+	   }(j));
+	}*/
+
+	/*for (let j = 0; j < 5; j++){ 
+		myGameCell[1][j] = 'yellow';
+		myGameCell[1][j+1] = 'orange';
+		myGameCell[1][j+2] = 'red';
+		//rgb(255, 165, 0);
+		//setTimeout(function(){ alert("Hello"); }, 3000);
+		
+		setTimeout(arguments.callee, 1000);
+		//alert("Hello");
+		//myPositionLed += 1;
+		//setTimeout(drawGameArea, 300);
+		drawGameArea();
+		myGameCell[1][j] = 'purple';
+		myGameCell[1][j+1] = 'purple';
+		myGameCell[1][j+2] = 'purple';
+		//alert("Hello");
+	}*/
+}
+
+function evaluateGame() {
+	if((targetPositionRing==myPositionRing)&&(targetPositionLed==myPositionLed)){// you win 
+		//alert ("op naar het volgende level");
+		niceEffect();
+    }else if((enemyPositionRing==myPositionRing)&&(enemyPositionLed==myPositionLed)){// you loose	
+		//alert ("game over! nog eens proberen?");
+		startGame();
+	} 
+}
+
+function getFreeRow(columnNr) {
+	var rowNr = -1;
+	for (let j = 0; j < 6; j++){ // 6 rows
+		if (myGameCell[columnNr][j] == 0){
+			return j;
+		}
+	}
+	return rowNr;
+}
+
+function drawCircle(x, y, r, color){
+	ctx = this.canvas.getContext("2d");
+	ctx.fillStyle = color;
+	ctx.beginPath();
+	ctx.arc(x, y, r, 0, 2 * Math.PI);
+	ctx.fill();
+	ctx.lineWidth = 1;
+	ctx.strokeStyle = 'black';
+	ctx.stroke(); 
+}
+
+function drawLine(x1, y1, x2, y2, color){
+	ctx = this.canvas.getContext("2d");
+	ctx.moveTo(x1, y1);
+	ctx.lineTo(x2, y2);
+	ctx.lineWidth = 1;
+	ctx.strokeStyle = color;
+	ctx.stroke(); 
+}
+
+function drawGameArea() {
+	// (0,0) is the upper left corner of the canvas
+	//alert("drawGameArea");
+	var color;
+	var x;
+	var y;
+	var angle;
+	for (let i = 0; i < nrRings; i++){
+		for (let j = 0; j < nrLedsOuterRing; j++){
+			myGameCell[i][j] = 'purple';
+		}
+    } 
+	myGameCell[myPositionRing][myPositionLed] = 'white';
+	myGameCell[enemyPositionRing][enemyPositionLed] = 'red';
+	myGameCell[targetPositionRing][targetPositionLed] = 'black';
+
+	for (let i = 0; i < nrRings; i++){
+		for (let j = 0; j < nrLedsOuterRing; j++){
+			angle = j*(2*Math.PI/nrLedsOuterRing);
+			if (i==0) {// inner ring
+				var rest = j % 2;
+				//alert ("i = " + i + " j = " + j + " rest = " + rest + " color = "+ myGameCell[i][j]);
+				if (!(j % 2)){	// only the even leds of the inner ring are used
+					x = myGameWidth/2 + 140*Math.cos(angle);
+					y = myGameHeight/2 + 140*Math.sin(angle);
+					drawLine(myGameWidth/2 + 160*Math.cos(angle),myGameHeight/2 + 160*Math.sin(angle),myGameWidth/2 + 260*Math.cos(angle),myGameHeight/2 + 260*Math.sin(angle),'black');
+					drawCircle(x, y, 10 ,myGameCell[i][j]);	
+				}
+			} else if (i==1) {// outer ring
+				x = myGameWidth/2 + 280*Math.cos(angle);
+				y = myGameHeight/2 + 280*Math.sin(angle);
+				drawCircle(x, y, 10 ,myGameCell[i][j]);	
+			}	
+		}
+    } 
+}
+
+/*<p>
+<ul>
+	<li><a href="https://www.w3schools.com/graphics/canvas_drawing.asp" target="_blank">Canvas drawing</a></li>
+	<li><a href="https://www.w3schools.com/jsref/jsref_statements.asp" target="_blank">Java script</a></li>
+	<li><a href="https://www.html5canvastutorials.com/tutorials/html5-canvas-rectangles/" target="_blank">Another canvas tutorial</a></li>
+	http://marcgg.com/blog/2016/11/01/javascript-audio/
+</ul>
+</p>*/
+
+</script>
+
+
+
+</body>
+</html>
